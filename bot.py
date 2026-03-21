@@ -8,7 +8,6 @@ from collections import defaultdict
 #  CONFIGURATION — METS TES CLÉS ICI
 # ══════════════════════════════════════════════════════════
 import os
-import os
 DISCORD_TOKEN    = os.environ.get("DISCORD_TOKEN")
 MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY")
 MAX_HISTORY        = 10
