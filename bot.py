@@ -8,9 +8,9 @@ from collections import defaultdict
 #  CONFIGURATION — METS TES CLÉS ICI
 # ══════════════════════════════════════════════════════════
 import os
-DISCORD_TOKEN    = os.environ.get("MTQ4NDMwMDkwMTM3NTE0ODI3NQ.GKVmVu.JHppe9FGJLvcHg4NZSQeIHfeXy8mrPRJtrnBwo")
-MISTRAL_API_KEY  = os.environ.get("1hqwpUfQi2aAWOUX9nHKJBY4e2BNwOzz")
-
+import os
+DISCORD_TOKEN    = os.environ.get("DISCORD_TOKEN")
+MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY")
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
 
