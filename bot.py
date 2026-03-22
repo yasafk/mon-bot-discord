@@ -7,8 +7,9 @@ from collections import defaultdict
 # ══════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════
-DISCORD_TOKEN    = "METS_TON_TOKEN_ICI"
-MISTRAL_API_KEY  = "METS_TA_CLE_MISTRAL_ICI"
+import os
+DISCORD_TOKEN    = os.environ.get("DISCORD_TOKEN")
+MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY")
 
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
