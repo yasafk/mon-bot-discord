@@ -5,33 +5,33 @@ import re
 from collections import defaultdict
 
 # ══════════════════════════════════════════════════════════
-#  CONFIGURATION — METS TES CLÉS ICI
+#  CONFIGURATION
 # ══════════════════════════════════════════════════════════
-import os
-DISCORD_TOKEN    = os.environ.get("DISCORD_TOKEN")
-MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY")
+DISCORD_TOKEN    = "METS_TON_TOKEN_ICI"
+MISTRAL_API_KEY  = "METS_TA_CLE_MISTRAL_ICI"
+
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
 
-SYSTEM_PROMPT ="""Tu t'appelles Víðarr, t'es un pote intelligent et sympa dans un serveur Discord.
+SYSTEM_PROMPT = """Tu t'appelles Víðarr, t'es un pote intelligent et sympa dans un serveur Discord.
 
 Ta personnalité :
 - Tu parles naturellement comme un ami, pas comme un robot
 - Tu es décontracté, parfois drôle, toujours bienveillant
 - Tu utilises des phrases courtes et directes
-- Tu évites les gros pavés de texte et les listes à rallonge sauf si cela est demandé
-- Tu peux utiliser des expressions familières et t'adapter au vocabulaire des autres personnes
+- Tu évites les gros pavés de texte et les listes à rallonge
+- Tu peux utiliser des expressions familières genre "ouais", "franchement", "clairement" etc
 - Tu es curieux et tu t'intéresses vraiment aux gens à qui tu parles
 
 Quand tu fais une recherche :
 - Tu résumes en 2-3 phrases simples ce que t'as trouvé
-- Tu donnes le lien des sources à la fin
+- Tu donnes le lien de la source à la fin, c'est tout
 - Tu ne fais pas une liste de 10 sources inutiles
 
 Règles importantes :
 - Tu te souviens de la conversation et tu t'en sers
 - Tu réponds en français sauf si on te parle autrement
-- Si quelqu'un te salue ou te parle sans t'avoir demandé de chercher tu réponds naturellement, pas besoin de chercher sur internet
+- Si quelqu'un te salue tu réponds naturellement, pas besoin de chercher sur internet
 - Tu restes toi-même que ce soit pour discuter ou pour chercher des infos
 """
 
@@ -46,7 +46,7 @@ conversation_history = defaultdict(list)
 
 
 # ══════════════════════════════════════════════════════════
-#  APPEL MISTRAL (via HTTP direct)
+#  APPEL MISTRAL
 # ══════════════════════════════════════════════════════════
 async def call_mistral(messages: list) -> str:
     url = "https://api.mistral.ai/v1/chat/completions"
@@ -67,7 +67,7 @@ async def call_mistral(messages: list) -> str:
 
 
 # ══════════════════════════════════════════════════════════
-#  RECHERCHE WEB (DuckDuckGo — gratuit, sans clé)
+#  RECHERCHE WEB DUCKDUCKGO
 # ══════════════════════════════════════════════════════════
 async def search_web(query: str) -> list[dict]:
     results = []
@@ -80,15 +80,15 @@ async def search_web(query: str) -> list[dict]:
                     data = await resp.json(content_type=None)
                     if data.get("AbstractText"):
                         results.append({
-                            "title":       data.get("Heading", "Résumé"),
-                            "url":         data.get("AbstractURL", ""),
+                            "title": data.get("Heading", "Résumé"),
+                            "url": data.get("AbstractURL", ""),
                             "description": data["AbstractText"],
                         })
                     for item in data.get("RelatedTopics", [])[:MAX_SEARCH_RESULTS]:
                         if isinstance(item, dict) and item.get("Text"):
                             results.append({
-                                "title":       item.get("Text", "")[:60],
-                                "url":         item.get("FirstURL", ""),
+                                "title": item.get("Text", "")[:60],
+                                "url": item.get("FirstURL", ""),
                                 "description": item.get("Text", ""),
                             })
 
@@ -97,27 +97,20 @@ async def search_web(query: str) -> list[dict]:
             async with session.get(search_url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
                     html = await resp.text()
-                    titles   = re.findall(r'class="result__title">.*?<a[^>]*>(.*?)</a>', html, re.DOTALL)
-                    urls     = re.findall(r'class="result__url"[^>]*>(.*?)</span>', html, re.DOTALL)
+                    titles = re.findall(r'class="result__title">.*?<a[^>]*>(.*?)</a>', html, re.DOTALL)
+                    urls = re.findall(r'class="result__url"[^>]*>(.*?)</span>', html, re.DOTALL)
                     snippets = re.findall(r'class="result__snippet">(.*?)</a>', html, re.DOTALL)
                     for i in range(min(len(titles), MAX_SEARCH_RESULTS)):
-                        title   = re.sub(r'<[^>]+>', '', titles[i]).strip()
+                        title = re.sub(r'<[^>]+>', '', titles[i]).strip()
                         url_txt = urls[i].strip() if i < len(urls) else ""
                         snippet = re.sub(r'<[^>]+>', '', snippets[i]).strip() if i < len(snippets) else ""
                         if title and url_txt:
                             if not url_txt.startswith("http"):
                                 url_txt = "https://" + url_txt
                             results.append({"title": title, "url": url_txt, "description": snippet})
-   except Exception as e:
-    if "rate" in str(e).lower():
-        await message.reply("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
-    elif "timeout" in str(e).lower():
-        await message.reply("⌛ Mistral met trop de temps à répondre, réessaie !")
-    elif "401" in str(e):
-        await message.reply("🔑 Problème de clé API, contacte l'admin !")
-    else:
-        await message.reply(f"😅 Oups quelque chose a planté, réessaie dans un moment !")
-        print(f"ERREUR COMPLETE : {e}")
+    except Exception as e:
+        print(f"[SEARCH ERROR] {e}")
+
     seen, unique = set(), []
     for r in results:
         if r["url"] not in seen and r["url"]:
@@ -157,23 +150,20 @@ SEARCH_KEYWORDS = [
     "documentation", "doc", "tuto", "guide", "exemple",
     "github", "api", "library", "framework", "install",
     "recherche", "trouve", "cherche", "source", "lien",
-    "explique", "définition", "kesako",
+    "explique", "définition",
 ]
+
 
 def needs_search(text: str) -> bool:
     lower = text.lower()
-    # Si c'est clairement une conversation, pas de recherche
     for kw in CONVERSATION_KEYWORDS:
         if kw in lower:
             return False
-    # Si c'est trop court, pas de recherche
     if len(text) < 15:
         return False
-    # Si mot-clé de recherche détecté
     for kw in SEARCH_KEYWORDS:
         if kw in lower:
             return True
-    # Par défaut, recherche si phrase longue
     return len(text) > 40
 
 
@@ -185,7 +175,7 @@ async def get_ai_response(user_id: int, user_message: str, search_results: list[
 
     if search_results:
         context = format_search_context(search_results)
-        full_message = f"{context}\n\n=== QUESTION DE L'UTILISATEUR ===\n{user_message}"
+        full_message = f"{context}\n\n=== QUESTION ===\n{user_message}"
     else:
         full_message = user_message
 
@@ -257,11 +247,10 @@ async def on_message(message: discord.Message):
         return
 
     if content.lower() in ["aide", "help", "?"]:
-        embed = discord.Embed(title="👋 Vali — Ton assistant Discord", color=0xFF7000)
+        embed = discord.Embed(title="👋 Víðarr — Ton assistant Discord", color=0xFF7000)
         embed.add_field(name="💬 Conversation", value="Dis-moi bonjour, pose des questions, discute !", inline=False)
-        embed.add_field(name="🔍 Recherche", value="Je cherche sur internet et cite mes sources", inline=False)
-        embed.add_field(name="🛠️ Commandes", value="`@Vali reset` — Efface la mémoire\n`@Vali aide` — Cette aide", inline=False)
-        embed.add_field(name="💡 Exemples", value="`@Vali salut comment tu vas ?`\n`@Vali c'est quoi Mistral AI ?`\n`@Vali news IA 2025`", inline=False)
+        embed.add_field(name="🔍 Recherche", value="Je cherche sur internet et te résume ce que j'ai trouvé", inline=False)
+        embed.add_field(name="🛠️ Commandes", value="`@Víðarr reset` — Efface la mémoire\n`@Víðarr aide` — Cette aide", inline=False)
         embed.set_footer(text="Mistral AI + DuckDuckGo — 100% gratuit")
         await message.reply(embed=embed)
         return
@@ -282,7 +271,16 @@ async def on_message(message: discord.Message):
                 else:
                     await message.channel.send(part)
         except Exception as e:
-            await message.reply(f"❌ Erreur : `{e}`")
+            error = str(e).lower()
+            if "rate" in error:
+                await message.reply("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
+            elif "timeout" in error:
+                await message.reply("⌛ Ça met trop de temps à répondre, réessaie !")
+            elif "401" in error:
+                await message.reply("🔑 Problème de clé API, contacte l'admin !")
+            else:
+                await message.reply("😅 Oups quelque chose a planté, réessaie dans un moment !")
+            print(f"ERREUR COMPLETE : {e}")
 
 
 # ══════════════════════════════════════════════════════════
