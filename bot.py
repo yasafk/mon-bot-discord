@@ -108,9 +108,16 @@ async def search_web(query: str) -> list[dict]:
                             if not url_txt.startswith("http"):
                                 url_txt = "https://" + url_txt
                             results.append({"title": title, "url": url_txt, "description": snippet})
-    except Exception as e:
-        print(f"[SEARCH ERROR] {e}")
-
+   except Exception as e:
+    if "rate" in str(e).lower():
+        await message.reply("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
+    elif "timeout" in str(e).lower():
+        await message.reply("⌛ Mistral met trop de temps à répondre, réessaie !")
+    elif "401" in str(e):
+        await message.reply("🔑 Problème de clé API, contacte l'admin !")
+    else:
+        await message.reply(f"😅 Oups quelque chose a planté, réessaie dans un moment !")
+        print(f"ERREUR COMPLETE : {e}")
     seen, unique = set(), []
     for r in results:
         if r["url"] not in seen and r["url"]:
