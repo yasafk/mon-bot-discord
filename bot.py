@@ -228,7 +228,7 @@ def split_message(text: str, max_len: int = 1990) -> list[str]:
 async def on_ready():
     print(f"✅ Bot connecté : {client.user}")
     print(f"📡 Serveurs : {len(client.guilds)}")
-    print(f"🤖 IA : OpenRouter (gratuit)")
+    print(f"🤖 IA : OpenRouter v2 (gratuit)")
     print(f"🔍 Moteur : DuckDuckGo (gratuit)")
     await client.change_presence(
         activity=discord.Activity(
