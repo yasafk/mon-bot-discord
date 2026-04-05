@@ -2,14 +2,14 @@ import discord
 import asyncio
 import aiohttp
 import re
+import os
 from collections import defaultdict
 
 # ══════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════
-import os
-DISCORD_TOKEN    = os.environ.get("DISCORD_TOKEN")
-MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY")
+DISCORD_TOKEN      = os.environ.get("DISCORD_TOKEN")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
 
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
@@ -34,7 +34,7 @@ Règles importantes :
 - Tu réponds en français sauf si on te parle autrement
 - Si quelqu'un te salue tu réponds naturellement, pas besoin de chercher sur internet
 - Tu restes toi-même que ce soit pour discuter ou pour chercher des infos
-- Ne mets pas de point par paragraphe, écris ton texte normalement comme les autres personnes du serveur 
+- Ne mets pas de point par paragraphe, écris ton texte normalement comme les autres personnes du serveur
 """
 
 # ══════════════════════════════════════════════════════════
@@ -48,16 +48,18 @@ conversation_history = defaultdict(list)
 
 
 # ══════════════════════════════════════════════════════════
-#  APPEL MISTRAL
+#  APPEL OPENROUTER
 # ══════════════════════════════════════════════════════════
-async def call_mistral(messages: list) -> str:
-    url = "https://api.mistral.ai/v1/chat/completions"
+async def call_ai(messages: list) -> str:
+    url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {MISTRAL_API_KEY}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://discord.com",
+        "X-Title": "Vidarr Discord Bot"
     }
     body = {
-        "model": "mistral-large-latest",
+        "model": "meta-llama/llama-3.2-3b-instruct:free",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0.7
@@ -65,7 +67,13 @@ async def call_mistral(messages: list) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=body, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             data = await resp.json()
-            return data["choices"][0]["message"]["content"]
+            print(f"RÉPONSE IA : {data}")
+            if "choices" in data and len(data["choices"]) > 0:
+                return data["choices"][0]["message"]["content"]
+            elif "error" in data:
+                raise Exception(f"Erreur IA : {data['error']}")
+            else:
+                raise Exception(f"Réponse inattendue : {data}")
 
 
 # ══════════════════════════════════════════════════════════
@@ -187,7 +195,7 @@ async def get_ai_response(user_id: int, user_message: str, search_results: list[
         conversation_history[user_id] = history
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history
-    reply = await call_mistral(messages)
+    reply = await call_ai(messages)
     history.append({"role": "assistant", "content": reply})
     return reply
 
@@ -220,7 +228,7 @@ def split_message(text: str, max_len: int = 1990) -> list[str]:
 async def on_ready():
     print(f"✅ Bot connecté : {client.user}")
     print(f"📡 Serveurs : {len(client.guilds)}")
-    print(f"🤖 IA : Mistral (gratuit)")
+    print(f"🤖 IA : OpenRouter (gratuit)")
     print(f"🔍 Moteur : DuckDuckGo (gratuit)")
     await client.change_presence(
         activity=discord.Activity(
@@ -240,12 +248,12 @@ async def on_message(message: discord.Message):
     content = re.sub(r"<@!?[0-9]+>", "", message.content).strip()
 
     if not content:
-        await message.reply("👋 Pose-moi une question ou dis-moi bonjour !")
+        await message.channel.send("👋 Pose-moi une question ou dis-moi bonjour !")
         return
 
     if content.lower() in ["reset", "efface", "oublie"]:
         conversation_history[message.author.id].clear()
-        await message.reply("🗑️ Mémoire effacée !")
+        await message.channel.send("🗑️ Mémoire effacée !")
         return
 
     if content.lower() in ["aide", "help", "?"]:
@@ -253,8 +261,8 @@ async def on_message(message: discord.Message):
         embed.add_field(name="💬 Conversation", value="Dis-moi bonjour, pose des questions, discute !", inline=False)
         embed.add_field(name="🔍 Recherche", value="Je cherche sur internet et te résume ce que j'ai trouvé", inline=False)
         embed.add_field(name="🛠️ Commandes", value="`@Víðarr reset` — Efface la mémoire\n`@Víðarr aide` — Cette aide", inline=False)
-        embed.set_footer(text="Mistral AI + DuckDuckGo — 100% gratuit")
-        await message.reply(embed=embed)
+        embed.set_footer(text="OpenRouter + DuckDuckGo — 100% gratuit")
+        await message.channel.send(embed=embed)
         return
 
     async with message.channel.typing():
@@ -265,23 +273,18 @@ async def on_message(message: discord.Message):
         try:
             reply = await get_ai_response(message.author.id, content, search_results)
             parts = split_message(reply)
-            first = True
             for part in parts:
-                if first:
-                    await message.reply(part)
-                    first = False
-                else:
-                    await message.channel.send(part)
+                await message.channel.send(part)
         except Exception as e:
             error = str(e).lower()
             if "rate" in error:
-                await message.reply("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
+                await message.channel.send("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
             elif "timeout" in error:
-                await message.reply("⌛ Ça met trop de temps à répondre, réessaie !")
+                await message.channel.send("⌛ Ça met trop de temps à répondre, réessaie !")
             elif "401" in error:
-                await message.reply("🔑 Problème de clé API, contacte l'admin !")
+                await message.channel.send("🔑 Problème de clé API, contacte l'admin !")
             else:
-                await message.reply("😅 Oups quelque chose a planté, réessaie dans un moment !")
+                await message.channel.send("😅 Oups quelque chose a planté, réessaie dans un moment !")
             print(f"ERREUR COMPLETE : {e}")
 
 
