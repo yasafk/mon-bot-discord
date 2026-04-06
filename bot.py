@@ -59,7 +59,7 @@ async def call_ai(messages: list) -> str:
         "X-Title": "Vidarr Discord Bot"
     }
     body = {
-        "model": "venice-ai/venice-uncensored:free",
+        "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0.7
