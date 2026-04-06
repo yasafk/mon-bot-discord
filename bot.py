@@ -59,7 +59,7 @@ async def call_ai(messages: list) -> str:
         "X-Title": "Vidarr Discord Bot"
     }
     body = {
-       "model": "deepseek/deepseek-r1:free",
+        "model": "meta-llama/llama-3.3-70b-instruct:free",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0.7
