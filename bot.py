@@ -8,8 +8,8 @@ from collections import defaultdict
 # ══════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════
-DISCORD_TOKEN      = os.environ.get("DISCORD_TOKEN")
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+DISCORD_TOKEN   = os.environ.get("DISCORD_TOKEN")
+VENICE_API_KEY  = os.environ.get("VENICE_API_KEY")
 
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
@@ -48,18 +48,16 @@ conversation_history = defaultdict(list)
 
 
 # ══════════════════════════════════════════════════════════
-#  APPEL OPENROUTER
+#  APPEL VENICE AI
 # ══════════════════════════════════════════════════════════
 async def call_ai(messages: list) -> str:
-    url = "https://openrouter.ai/api/v1/chat/completions"
+    url = "https://api.venice.ai/api/v1/chat/completions"
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://discord.com",
-        "X-Title": "Vidarr Discord Bot"
+        "Authorization": f"Bearer {VENICE_API_KEY}",
+        "Content-Type": "application/json"
     }
     body = {
-        "model": "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+        "model": "dolphin-2.9.2-qwen2-72b",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0.7
@@ -67,11 +65,11 @@ async def call_ai(messages: list) -> str:
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=body, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             data = await resp.json()
-            print(f"RÉPONSE IA : {data}")
+            print(f"RÉPONSE VENICE : {data}")
             if "choices" in data and len(data["choices"]) > 0:
                 return data["choices"][0]["message"]["content"]
             elif "error" in data:
-                raise Exception(f"Erreur IA : {data['error']}")
+                raise Exception(f"Erreur Venice : {data['error']}")
             else:
                 raise Exception(f"Réponse inattendue : {data}")
 
@@ -228,7 +226,7 @@ def split_message(text: str, max_len: int = 1990) -> list[str]:
 async def on_ready():
     print(f"✅ Bot connecté : {client.user}")
     print(f"📡 Serveurs : {len(client.guilds)}")
-    print(f"🤖 IA : OpenRouter v2 (gratuit)")
+    print(f"🤖 IA : Venice AI")
     print(f"🔍 Moteur : DuckDuckGo (gratuit)")
     await client.change_presence(
         activity=discord.Activity(
@@ -261,7 +259,7 @@ async def on_message(message: discord.Message):
         embed.add_field(name="💬 Conversation", value="Dis-moi bonjour, pose des questions, discute !", inline=False)
         embed.add_field(name="🔍 Recherche", value="Je cherche sur internet et te résume ce que j'ai trouvé", inline=False)
         embed.add_field(name="🛠️ Commandes", value="`@Víðarr reset` — Efface la mémoire\n`@Víðarr aide` — Cette aide", inline=False)
-        embed.set_footer(text="OpenRouter + DuckDuckGo — 100% gratuit")
+        embed.set_footer(text="Venice AI + DuckDuckGo")
         await message.channel.send(embed=embed)
         return
 
