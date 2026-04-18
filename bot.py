@@ -57,7 +57,7 @@ async def call_ai(messages: list) -> str:
         "Content-Type": "application/json"
     }
     body = {
-        "model": "dolphin-2.9.2-qwen2-72b",
+        "model": "llama-3.3-70b",
         "messages": messages,
         "max_tokens": 1500,
         "temperature": 0.7
