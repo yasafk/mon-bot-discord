@@ -8,8 +8,8 @@ from collections import defaultdict
 # ══════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════
-DISCORD_TOKEN   = os.environ.get("DISCORD_TOKEN")
-VENICE_API_KEY  = os.environ.get("VENICE_API_KEY")
+DISCORD_TOKEN  = os.environ.get("DISCORD_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 MAX_HISTORY        = 10
 MAX_SEARCH_RESULTS = 5
@@ -48,28 +48,49 @@ conversation_history = defaultdict(list)
 
 
 # ══════════════════════════════════════════════════════════
-#  APPEL VENICE AI
+#  APPEL GEMINI
 # ══════════════════════════════════════════════════════════
 async def call_ai(messages: list) -> str:
-    url = "https://api.venice.ai/api/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {VENICE_API_KEY}",
-        "Content-Type": "application/json"
-    }
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {"Content-Type": "application/json"}
+
+    # Convertit les messages au format Gemini
+    gemini_messages = []
+    system_text = ""
+
+    for msg in messages:
+        if msg["role"] == "system":
+            system_text = msg["content"]
+        elif msg["role"] == "user":
+            gemini_messages.append({
+                "role": "user",
+                "parts": [{"text": msg["content"]}]
+            })
+        elif msg["role"] == "assistant":
+            gemini_messages.append({
+                "role": "model",
+                "parts": [{"text": msg["content"]}]
+            })
+
     body = {
-        "model": "llama-3.3-70b",
-        "messages": messages,
-        "max_tokens": 1500,
-        "temperature": 0.7
+        "system_instruction": {
+            "parts": [{"text": system_text}]
+        },
+        "contents": gemini_messages,
+        "generationConfig": {
+            "maxOutputTokens": 1500,
+            "temperature": 0.7
+        }
     }
+
     async with aiohttp.ClientSession() as session:
         async with session.post(url, headers=headers, json=body, timeout=aiohttp.ClientTimeout(total=30)) as resp:
             data = await resp.json()
-            print(f"RÉPONSE VENICE : {data}")
-            if "choices" in data and len(data["choices"]) > 0:
-                return data["choices"][0]["message"]["content"]
+            print(f"RÉPONSE GEMINI : {data}")
+            if "candidates" in data and len(data["candidates"]) > 0:
+                return data["candidates"][0]["content"]["parts"][0]["text"]
             elif "error" in data:
-                raise Exception(f"Erreur Venice : {data['error']}")
+                raise Exception(f"Erreur Gemini : {data['error']['message']}")
             else:
                 raise Exception(f"Réponse inattendue : {data}")
 
@@ -226,7 +247,7 @@ def split_message(text: str, max_len: int = 1990) -> list[str]:
 async def on_ready():
     print(f"✅ Bot connecté : {client.user}")
     print(f"📡 Serveurs : {len(client.guilds)}")
-    print(f"🤖 IA : Venice AI")
+    print(f"🤖 IA : Gemini 2.0 Flash (1500 req/jour gratuit)")
     print(f"🔍 Moteur : DuckDuckGo (gratuit)")
     await client.change_presence(
         activity=discord.Activity(
@@ -259,7 +280,7 @@ async def on_message(message: discord.Message):
         embed.add_field(name="💬 Conversation", value="Dis-moi bonjour, pose des questions, discute !", inline=False)
         embed.add_field(name="🔍 Recherche", value="Je cherche sur internet et te résume ce que j'ai trouvé", inline=False)
         embed.add_field(name="🛠️ Commandes", value="`@Víðarr reset` — Efface la mémoire\n`@Víðarr aide` — Cette aide", inline=False)
-        embed.set_footer(text="Venice AI + DuckDuckGo")
+        embed.set_footer(text="Gemini 2.0 Flash + DuckDuckGo — 1500 req/jour gratuit")
         await message.channel.send(embed=embed)
         return
 
@@ -275,11 +296,11 @@ async def on_message(message: discord.Message):
                 await message.channel.send(part)
         except Exception as e:
             error = str(e).lower()
-            if "rate" in error:
-                await message.channel.send("⏳ Trop de messages d'un coup, réessaie dans quelques secondes !")
+            if "rate" in error or "quota" in error:
+                await message.channel.send("⏳ Limite journalière atteinte, réessaie demain !")
             elif "timeout" in error:
                 await message.channel.send("⌛ Ça met trop de temps à répondre, réessaie !")
-            elif "401" in error:
+            elif "401" in error or "api key" in error:
                 await message.channel.send("🔑 Problème de clé API, contacte l'admin !")
             else:
                 await message.channel.send("😅 Oups quelque chose a planté, réessaie dans un moment !")
